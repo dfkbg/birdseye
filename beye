@@ -1,0 +1,300 @@
+#!/usr/bin/python -u
+
+import argparse
+import json
+import logging
+import os
+import pprint
+import re
+import sys
+import time
+import socket
+import requests
+
+from datetime import datetime
+from dateutil import parser
+from tabulate import tabulate
+
+
+###########
+
+defcols = {
+	'status': ['version','router_id','server_time','last_reconfig','last_reboot','message'],
+	'protocols': ['protocol,state,bgp_state,routes,description'],
+	'routes': ['network,interface,gateway,metric,bgp.local_pref,bgp.med,bgp.as_path'],
+	'route': ['network,interface,gateway,metric,bgp'],
+}
+
+commands = 'Commands: status / symbols / symbols tables / symbols protocols / protocols bgp / routes protocol [protocol] / routes table [table] / route [prefix] [table]'
+
+ap = argparse.ArgumentParser(description='beye: birdseye CLI',epilog=commands)
+ap.add_argument("cmd", nargs='?', default="status", help="command")
+ap.add_argument("args", nargs='*', help="argument(s)")
+ap.add_argument("-s", "--server", default="rc1-cix-ipv4.inex.ie", help="Server URL [rc1-cix-ipv4.inex.ie]")
+ap.add_argument("-v", "--verbosity", action="count", help="output verbosity (multiple times to increase)")
+ap.add_argument("-c", "--cols", action="append", help="columns to display")
+ap.add_argument("-p", "--plain", action="count", help="plain output for piping, -pp removes blanks within columns")
+ap.add_argument("-a", "--all", action="count", help="output everything as tree structure")
+ap.add_argument("-r", "--raw", action="count", help="output full API response as tree structure")
+cmdl = ap.parse_args()
+
+os.environ['TZ'] = "UTC 0";
+pp = pprint.PrettyPrinter(indent=4)
+pid = os.getpid()
+logging.basicConfig(level=logging.ERROR)
+
+re_date = re.compile("[0-9]+-[0-9]+-[0-9]+T[0-9]+:[0-9]+:[0-9]+")
+
+############
+
+class switch(object):
+	def __init__(self, value):
+		self.value = value
+		self.fall = False
+
+	def __iter__(self):
+		"""Return the match method once, then stop"""
+		yield self.match
+		raise StopIteration
+	
+	def match(self, *args):
+		"""Indicate whether or not to enter a case suite"""
+		if self.fall or not args:
+			return True
+		elif self.value in args: # changed for v1.5, see below
+			self.fall = True
+			return True
+		else:
+			return False
+
+def datestr(str):
+
+	dt = parser.parse(str)
+	if (dt.hour==0 & dt.minute==0 & dt.second==0):
+		return(dt.strftime("%Y-%m-%d"))
+	else:
+		return(dt.strftime("%Y-%m-%d %H:%M:%S"))
+
+
+def beyeget(server, cmd):
+
+	resp = requests.get('http://'+server+'/api/'+cmd)
+
+	if resp.status_code != 200:
+		logging.error("Server Error: %d, %s", resp.status_code, resp.reason)
+		sys.exit(1)
+
+	if cmdl.verbosity >2:
+		print "Got string: <", resp.text, ">"
+
+	r = resp.json()
+
+	if  r['api']['version'] <> "1.0.0":
+		logging.error("Response Error: version %s is not the expected '1.0.0'",  r['api']['version'])
+		sys.exit(1)
+
+	return(r)
+
+def pformat(v):
+	if cmdl.plain>1:
+		return(str(do_pformat(v)).replace(' ','_'))
+	else:
+		return(do_pformat(v))
+
+def do_pformat(v):
+	if type(v) is list:
+		if type(v[0]) is list:
+			if (len(v)==1):
+				return(str(v[0]).replace(' ',''))
+			else:
+				return(str(v).replace(' ',''))
+		return(','.join(v))
+	else:
+		try:
+			if re_date.match(v) != None:
+				return(datestr(v))
+			else:
+				return(v)
+		except Exception:
+			return(v)
+
+def getrow(dict, cols):
+	
+	r =[]
+	res =[]
+	for c in cols:
+		d = dict
+		c = c.split('.')
+		if len(c)>1:
+			for s in range(len(c)-1):
+				d = dict[c[s]]
+		v = d.get(c[-1], '-')
+		if 'values' in dir(v):
+			for vv in v.values():
+				r.append(pformat(vv))
+		else:
+			r.append(pformat(v))
+	return(r)	
+	
+
+def gethead(dict, cols):
+	
+	r =[]
+	for c in cols:
+		v = dict.get(c, '-')
+		if 'keys' in dir(v):
+			for vv in v.keys():
+				r.append(vv)
+		else:
+			r.append(c)
+	return(r)	
+	
+
+def colsexpand(cols):
+	r=[]
+	for c in cols:
+		for cc in c.split(','):
+			r.append(cc)
+	return(r)
+
+
+def statprint(r):
+	tab=[]
+	rv = r['status']
+
+	if cmdl.all > 0:
+		pp.pprint(rv)
+	else:
+		headers = gethead(rv,cols)
+		tab.append(getrow(rv, cols))
+	
+		if len(tab) > 0:
+			if cmdl.plain>0:
+				print tabulate(tab, tablefmt="plain")
+			else:
+				print tabulate(tab, headers=headers)
+
+def protprint(r):
+	if cmdl.all > 0:
+		pp.pprint(r['protocols'])
+	else:
+		tab=[]
+		headers=[]
+		for rk in r['protocols']:
+			rv = r['protocols'][rk]
+			if len(headers) == 0:
+				headers = gethead(rv,cols)
+			tab.append(getrow(rv, cols))
+	
+		if len(tab) > 0:
+			if cmdl.plain>0:
+				print tabulate(tab, tablefmt="plain")
+			else:
+				print tabulate(tab, headers=headers)
+
+
+def routesprint(r):
+	if cmdl.all > 0:
+		pp.pprint(r)
+	else:
+		tab=[]
+		headers=[]
+		for rv in r:
+			if len(headers) == 0:
+				headers = gethead(rv,cols)
+			tab.append(getrow(rv, cols))
+	
+		if len(tab) > 0:
+			if cmdl.plain>0:
+				print tabulate(tab, tablefmt="plain")
+			else:
+				print tabulate(tab, headers=headers)
+
+
+
+def symsprint(r):
+	if cmdl.all>0 | len(cmdl.args)==0:
+		pp.pprint(r['symbols'])
+	else:
+		for rv in r['symbols']:
+			print rv
+
+
+
+###############
+
+
+if cmdl.verbosity >1:
+	print "Running '%s' at '%s':" % (cmdl.cmd, cmdl.server,)
+	print "args: ", cmdl.args
+	print "cols: ", cmdl.cols
+
+if cmdl.cols == None:
+	try:
+		cols = colsexpand(defcols[cmdl.cmd])
+	except Exception:
+		cmdl.all = 1
+else:
+	cols = colsexpand(cmdl.cols)
+
+for case in switch(cmdl.cmd):
+	if case('status'):
+		r = beyeget(cmdl.server, 'status')
+		if cmdl.raw >0:
+			pp.pprint(r)
+		else:
+			statprint(r)
+		break
+
+	if case('protocols'):
+		r = beyeget(cmdl.server, 'protocols/'+cmdl.args[0])
+		if cmdl.raw >0:
+			pp.pprint(r)
+		else:
+			protprint(r)
+		break
+
+	if case('routes'):
+		r = beyeget(cmdl.server, 'routes/'+cmdl.args[0]+'/'+cmdl.args[1])
+		if cmdl.raw >0:
+			pp.pprint(r)
+		else:
+			routesprint(r['routes'])
+		break
+
+	if case('route'):
+		if len(cmdl.args) == 1:
+			r = beyeget(cmdl.server, 'route/'+cmdl.args[0])
+		elif len(cmdl.args) == 2:
+			r = beyeget(cmdl.server, 'route/'+cmdl.args[0]+'/table/'+cmdl.args[1])
+		else:
+			logging.error("number of arguments incorrect: %s", cmdl.args)
+			sys.exit(1)
+
+		if cmdl.raw >0:
+			pp.pprint(r)
+		else:
+			routesprint(r['routes'])
+		break
+
+	if case('symbols'):
+		if len(cmdl.args) ==0:
+			r = beyeget(cmdl.server, 'symbols')
+		elif len(cmdl.args) == 1:
+			r = beyeget(cmdl.server, 'symbols'+'/'+cmdl.args[0])
+		else:
+			logging.error("argument error: %s", cmdl.args)
+			sys.exit(1)
+
+		if cmdl.raw >0:
+			pp.pprint(r)
+		else:
+			symsprint(r)
+		break
+
+	if case():
+		logging.error("Unknown command: %s", cmdl.cmd)
+		sys.exit(1)
+
+if cmdl.verbosity >1:
+	print "%s done." % (cmdl.cmd,) 
