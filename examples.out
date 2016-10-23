@@ -1,27 +1,61 @@
+$ beye -h
+usage: beye [-h] [-s SERVER] [-v] [-c COLS] [-p] [-a] [-r]
+            [cmd] [args [args ...]]
+
+beye: birdseye CLI
+
+positional arguments:
+  cmd                   command
+  args                  argument(s)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -s SERVER, --server SERVER
+                        Server URL [rc1-cix-ipv4.inex.ie]
+  -v, --verbosity       output verbosity (multiple times to increase)
+  -c COLS, --cols COLS  columns to display
+  -p, --plain           plain output for piping, -pp removes blanks within
+                        columns
+  -a, --all             output everything as tree structure
+  -r, --raw             output full API response as tree structure
+
+Commands: status / symbols / symbols tables / symbols protocols / protocols
+bgp / routes protocol [protocol] / routes table [table] / route [prefix]
+[table]
+
+
+# human readable
 $ beye status
 version    router_id     server_time          last_reconfig        last_reboot          message
 ---------  ------------  -------------------  -------------------  -------------------  ------------------------
 1.5.0      185.1.69.126  2016-10-23 15:15:49  2016-10-23 15:12:01  2016-04-12 15:00:33  Daemon is up and running
 
+# select 'columns'
 $ beye status -c version,message
 version    message
 ---------  ------------------------
 1.5.0      Daemon is up and running
 
-$ beye status -c message,version
+# different order
+$ beye status -c message -c version
 message                   version
 ------------------------  ---------
 Daemon is up and running  1.5.0
 
+# 'plain' or 'for piping'
 $ beye status -p
 1.5.0  185.1.69.126  2016-10-23 15:15:49  2016-10-23 15:12:01  2016-04-12 15:00:33  Daemon is up and running
 
+# useful for quick import into scripts
 $ beye status -p -c version
 1.5.0
+# useful for quick import into scripts
 
+# plain with white space only between columns
 $ beye status -pp
 1.5.0  185.1.69.126  2016-10-23_15:15:49  2016-10-23_15:12:01  2016-04-12_15:00:33  Daemon_is_up_and_running
 
+# all bgp sessions
 $ beye protocols bgp
 protocol                 state    bgp_state      imported    exported    preferred  description
 -----------------------  -------  -----------  ----------  ----------  -----------  -------------------------------------------------
@@ -37,6 +71,7 @@ pb_as41736_vli232_ipv4   up       Established           2           0           
 pb_as29644_vli221_ipv4   up       Established          22           0           22  Peering session for AS29644 - Airspeed Telecom
 pb_as15405_vli230_ipv4   up       Established           3           0            3  Peering session for AS15405 - East Cork Broadband
 
+# all non-Estabished sessions on non-default server
 $ beye protocols bgp -s birdseye.inex.ie | grep -v Established
 protocol          state    bgp_state      imported    exported    preferred  description
 ----------------  -------  -----------  ----------  ----------  -----------  --------------------------------------------------------------------
@@ -45,6 +80,7 @@ protocol          state    bgp_state      imported    exported    preferred  des
 -                 -        Active                0           0            0  RIB for AS30900 - Web World Ireland - VLAN Interface 81
 -                 -        Connect               0           0            0  RIB for AS39233 - Blueface - VLAN Interface 41
 
+# routes
 $ beye routes protocol pb_as29644_vli221_ipv4
 network           interface    gateway        metric    bgp.local_pref  bgp.med    bgp.as_path
 ----------------  -----------  -----------  --------  ----------------  ---------  ---------------------------------
@@ -71,9 +107,11 @@ network           interface    gateway        metric    bgp.local_pref  bgp.med 
 185.167.196.0/22  ens160       185.1.69.13       100               100  -          29644
 208.94.70.0/24    ens160       185.1.69.13       100               100  -          29644,13971,13971,13971,13971
 
+# all routing tables
 $ beye symbols tables
 master
 
+# all routes in a specifit RIB 
 $ beye routes table master
 network           interface    gateway        metric    bgp.local_pref  bgp.med    bgp.as_path
 ----------------  -----------  -----------  --------  ----------------  ---------  -----------------------------------
@@ -259,6 +297,7 @@ network           interface    gateway        metric    bgp.local_pref  bgp.med 
 46.182.8.0/21     ens160       185.1.69.10       100               100  -          31122,1197
 195.7.32.0/19     ens160       185.1.69.12       100               100  -          5466
 
+# selecting non-standard columns, works hierarchically
 $ beye routes table master -c network,bgp
 network           origin        local_pref  communities                                                                                          next_hop
 ----------------  ----------  ------------  ---------------------------------------------------------------------------------------------------  ---------------
@@ -444,11 +483,13 @@ network           origin        local_pref  communities                         
 46.182.8.0/21     IGP                  100  [[0,29644],[0,29644]]                                                                                185.1.69.10
 195.7.32.0/19     IGP                  100  [[5466,1],[5466,1],[5466,1]]                                                                         185.1.69.12
 
+# route to a specific address or prefix
 $ beye route 195.7.32.3 master
 network        interface    gateway        metric  origin      local_pref  communities                   next_hop       as_path
 -------------  -----------  -----------  --------  --------  ------------  ----------------------------  -----------  ---------
 195.7.32.0/19  ens160       185.1.69.12       100  IGP                100  [[5466,1],[5466,1],[5466,1]]  185.1.69.12       5466
 
+# all information in a structured format, useful to find which columns to select
 $ beye route 195.7.32.3 master -a
 [   {   u'bgp': {   u'as_path': [u'5466'],
                     u'communities': [[5466, 1], [5466, 1], [5466, 1]],
