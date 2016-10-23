@@ -7,7 +7,7 @@ Because the auther is not really fluent in python and the time was limited his h
 
 ## Documentation
 
-'beye -h' for now
+'beye -h' and [examples.out](examples.out) for now.
 
 ## Installation
 
