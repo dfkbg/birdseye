@@ -37,7 +37,7 @@ pb_as41736_vli232_ipv4   up       Established           2           0           
 pb_as29644_vli221_ipv4   up       Established          22           0           22  Peering session for AS29644 - Airspeed Telecom
 pb_as15405_vli230_ipv4   up       Established           3           0            3  Peering session for AS15405 - East Cork Broadband
 
-$ beye protocols bgp -s birdseye.inex.ie
+$ beye protocols bgp -s birdseye.inex.ie | grep -v Established
 protocol          state    bgp_state      imported    exported    preferred  description
 ----------------  -------  -----------  ----------  ----------  -----------  --------------------------------------------------------------------
 -                 -        Connect               0           0            0  RIB for AS10310 - Yahoo! - VLAN Interface 137
@@ -449,3 +449,15 @@ network        interface    gateway        metric  origin      local_pref  commu
 -------------  -----------  -----------  --------  --------  ------------  ----------------------------  -----------  ---------
 195.7.32.0/19  ens160       185.1.69.12       100  IGP                100  [[5466,1],[5466,1],[5466,1]]  185.1.69.12       5466
 
+$ beye route 195.7.32.3 master -a
+[   {   u'bgp': {   u'as_path': [u'5466'],
+                    u'communities': [[5466, 1], [5466, 1], [5466, 1]],
+                    u'local_pref': u'100',
+                    u'next_hop': u'185.1.69.12',
+                    u'origin': u'IGP'},
+        u'from_protocol': u'pb_as5466_vli223_ipv4',
+        u'gateway': u'185.1.69.12',
+        u'interface': u'ens160',
+        u'metric': 100,
+        u'network': u'195.7.32.0/19',
+        u'type': [u'BGP', u'unicast', u'univ']}]
