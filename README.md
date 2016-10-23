@@ -11,7 +11,8 @@ Because the auther is not really fluent in python and the time was limited his h
 
 ## Installation
 
-A stand-alone script. Major dependencies: requests, tabulate
+A stand-alone script. Major dependencies: (requests, tabulate).
+
 If someone else has time to properly package it the python way, be my guest!
 
 ## Authors:
