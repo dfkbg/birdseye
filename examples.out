@@ -49,7 +49,6 @@ $ beye status -p
 # useful for quick import into scripts
 $ beye status -p -c version
 1.5.0
-# useful for quick import into scripts
 
 # plain with white space only between columns
 $ beye status -pp
