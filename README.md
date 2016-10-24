@@ -1,9 +1,11 @@
 
-# Command Line Client for Bird's Eye - A Bird API
+# beye: Command Line Client for Bird's Eye - A Bird API
 
 This is a simple command line client for Bird's Eye written in python. It produces output formats intended for both humans *and* scripts.
+
 This is a project of the RIPE IXP Tools Hackaton just prior to RIPE73 in Madrid, Spain.
-Because the auther is not really fluent in python and the time was limited his has not become great python but rather a "perl script written in python".
+
+Because the author is not really fluent in python and the time was limited it has not become great python but rather a "perl script written in python".
 
 ## Documentation
 
@@ -26,3 +28,8 @@ https://github.com/inex/birdseye
 ## Complementary Projects
 
 * https://github.com/mhannig/birdseye - Python based web consumer by Matthias Hannig
+
+
+## License
+
+beye is open-sourced software licensed under the MIT license.
