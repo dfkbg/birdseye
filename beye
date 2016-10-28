@@ -41,9 +41,10 @@ cmdl = ap.parse_args()
 os.environ['TZ'] = "UTC 0";
 pp = pprint.PrettyPrinter(indent=4)
 pid = os.getpid()
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.WARNING)
 
 re_date = re.compile("[0-9]+-[0-9]+-[0-9]+T[0-9]+:[0-9]+:[0-9]+")
+re_version = re.compile("^1\.")
 
 ############
 
@@ -89,9 +90,9 @@ def beyeget(server, cmd):
 
 	r = resp.json()
 
-	if  r['api']['version'] <> "1.0.0":
-		logging.error("Response Error: version %s is not the expected '1.0.0'",  r['api']['version'])
-		sys.exit(1)
+
+	if re_version.match(r['api']['version']) == None:
+		logging.warning("API major version changed from 1.x.x to  %s",  r['api']['version'])
 
 	return(r)
 
